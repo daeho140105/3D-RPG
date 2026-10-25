@@ -1,86 +1,96 @@
-
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 
+// ================================
 // 기본 설정
+// ================================
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
-scene.fog = new THREE.Fog(0x87ceeb, 25, 100);
 
 const camera = new THREE.PerspectiveCamera(
-  70, window.innerWidth / window.innerHeight, 0.1, 200
+  60,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  500
 );
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({
+  antialias: true
+});
+
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-// 조명
-scene.add(new THREE.HemisphereLight(0xffffff, 0x557744, 2));
+// ================================
+// 빛
+// ================================
 
-const sun = new THREE.DirectionalLight(0xffffff, 2);
-sun.position.set(20, 30, 10);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+scene.add(ambientLight);
+
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(50, 100, 50);
 sun.castShadow = true;
 scene.add(sun);
 
+// ================================
+// 월드
+// ================================
+
+const WORLD_SIZE = 200;
+const WORLD_LIMIT = 95;
+
 // 바닥
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(200, 200),
-  new THREE.MeshStandardMaterial({ color: 0x70b84f })
+  new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE),
+  new THREE.MeshStandardMaterial({
+    color: 0x5fa64b
+  })
 );
+
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// 캐릭터
-const player = new THREE.Group();
-scene.add(player);
+// ================================
+// 고정된 월드용 랜덤
+// 새로고침해도 같은 결과가 나오게 함
+// ================================
 
-function makePart(parent, size, color, x, y, z) {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(...size),
-    new THREE.MeshStandardMaterial({ color })
-  );
-  mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  parent.add(mesh);
-  return mesh;
+let worldSeed = 123456;
+
+function seededRandom() {
+  worldSeed = (worldSeed * 9301 + 49297) % 233280;
+  return worldSeed / 233280;
 }
 
-makePart(player, [0.8, 1, 0.45], 0x2875d0, 0, 1.1, 0);
-makePart(player, [0.65, 0.65, 0.65], 0xffcc99, 0, 1.95, 0);
-makePart(player, [0.25, 0.9, 0.3], 0xffcc99, -0.55, 1.1, 0);
-makePart(player, [0.25, 0.9, 0.3], 0xffcc99, 0.55, 1.1, 0);
-makePart(player, [0.3, 0.7, 0.3], 0x333344, -0.22, 0.35, 0);
-makePart(player, [0.3, 0.7, 0.3], 0x333344, 0.22, 0.35, 0);
-
-// 나무 검
-const sword = new THREE.Group();
-player.add(sword);
-sword.position.set(0.75, 1.15, 0.15);
-
-makePart(sword, [0.14, 0.8, 0.12], 0xaaaaaa, 0, 0.5, 0);
-makePart(sword, [0.3, 0.1, 0.15], 0x8b5a2b, 0, 0.05, 0);
-makePart(sword, [0.12, 0.35, 0.12], 0x79502b, 0, -0.17, 0);
-
+// ================================
 // 나무
+// ================================
+
 function createTree(x, z) {
   const tree = new THREE.Group();
 
   const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.25, 0.35, 2),
-    new THREE.MeshStandardMaterial({ color: 0x79502b })
+    new THREE.CylinderGeometry(0.35, 0.45, 2.5, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0x704214
+    })
   );
-  trunk.position.y = 1;
+
+  trunk.position.y = 1.25;
   trunk.castShadow = true;
   tree.add(trunk);
 
   const leaves = new THREE.Mesh(
-    new THREE.ConeGeometry(1.5, 3, 7),
-    new THREE.MeshStandardMaterial({ color: 0x238b45 })
+    new THREE.SphereGeometry(1.5, 8, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0x248f24
+    })
   );
-  leaves.position.y = 3;
+
+  leaves.position.y = 3.1;
   leaves.castShadow = true;
   tree.add(leaves);
 
@@ -88,274 +98,778 @@ function createTree(x, z) {
   scene.add(tree);
 }
 
-for (let i = 0; i < 45; i++) {
-  const x = (Math.random() - 0.5) * 90;
-  const z = (Math.random() - 0.5) * 90;
-  if (Math.abs(x) > 5 || Math.abs(z) > 5) createTree(x, z);
-}
-
+// ================================
 // 바위
-for (let i = 0; i < 20; i++) {
+// ================================
+
+function createRock(x, z) {
   const rock = new THREE.Mesh(
-    new THREE.DodecahedronGeometry(0.6 + Math.random() * 0.7),
-    new THREE.MeshStandardMaterial({ color: 0x777777 })
+    new THREE.DodecahedronGeometry(1, 0),
+    new THREE.MeshStandardMaterial({
+      color: 0x777777
+    })
   );
-  rock.position.set(
-    (Math.random() - 0.5) * 70,
-    0.5,
-    (Math.random() - 0.5) * 70
-  );
+
+  rock.position.set(x, 0.7, z);
+  rock.scale.set(1.2, 0.8, 1);
   rock.castShadow = true;
+
   scene.add(rock);
 }
 
-// 슬라임 몬스터
-const slime = new THREE.Group();
-scene.add(slime);
-slime.position.set(0, 0, 6);
+// ================================
+// 고정된 월드 생성
+// ================================
 
-const slimeBody = new THREE.Mesh(
-  new THREE.SphereGeometry(0.85, 20, 16),
-  new THREE.MeshStandardMaterial({ color: 0x45df62 })
-);
-slimeBody.scale.set(1, 0.8, 1);
-slimeBody.position.y = 0.7;
-slimeBody.castShadow = true;
-slime.add(slimeBody);
+for (let i = 0; i < 35; i++) {
+  let x = (seededRandom() - 0.5) * 180;
+  let z = (seededRandom() - 0.5) * 180;
 
-// 슬라임 눈
-for (const x of [-0.25, 0.25]) {
-  const eye = new THREE.Mesh(
-    new THREE.SphereGeometry(0.09, 12, 12),
-    new THREE.MeshStandardMaterial({ color: 0x111111 })
-  );
-  eye.position.set(x, 0.85, -0.68);
-  slime.add(eye);
-}
-
-// 슬라임 입
-const mouth = new THREE.Mesh(
-  new THREE.BoxGeometry(0.22, 0.05, 0.05),
-  new THREE.MeshStandardMaterial({ color: 0x222222 })
-);
-mouth.position.set(0, 0.59, -0.77);
-slime.add(mouth);
-
-// 슬라임 머리 위 체력바
-const hpBar = new THREE.Group();
-slime.add(hpBar);
-hpBar.position.set(0, 2.0, 0);
-
-const hpBackground = new THREE.Mesh(
-  new THREE.PlaneGeometry(1.8, 0.18),
-  new THREE.MeshBasicMaterial({ color: 0x222222 })
-);
-hpBar.add(hpBackground);
-
-const hpFill = new THREE.Mesh(
-  new THREE.PlaneGeometry(1.8, 0.14),
-  new THREE.MeshBasicMaterial({ color: 0xff3333 })
-);
-hpFill.position.z = 0.01;
-hpBar.add(hpFill);
-
-// 체력바 업데이트
-function updateSlimeBar() {
-  const ratio = Math.max(0, slimeHP / 60);
-  hpFill.scale.x = ratio;
-  hpFill.position.x = -0.9 * (1 - ratio);
-  hpBar.visible = slimeAlive;
-}
-
-let slimeHP = 60;
-let slimeAlive = true;
-let kills = 0;
-let jelly = 0;
-
-// 화면 UI
-const hud = document.createElement('div');
-hud.style.cssText = `
-  position:fixed; top:15px; right:15px;
-  background:#222d; color:white; padding:15px;
-  border-radius:12px; z-index:5;
-  font-family:sans-serif; min-width:160px;
-`;
-document.body.appendChild(hud);
-
-function updateHUD() {
-  hud.innerHTML = `
-    <b>⚔️ 전투 정보</b>
-    <p>몬스터: 슬라임</p>
-    <p>슬라임 체력: ${Math.max(0, slimeHP)} / 60</p>
-    <p>처치 수: ${kills}</p>
-    <p>슬라임 젤리: ${jelly}개</p>
-    <p>무기: 나무 검</p>
-  `;
-}
-updateHUD();
-updateSlimeBar();
-// 조작
-const keys = {};
-let angle = 0;
-let pitch = 0.3;
-
-window.addEventListener('keydown', e => {
-  keys[e.key.toLowerCase()] = true;
-});
-window.addEventListener('keyup', e => {
-  keys[e.key.toLowerCase()] = false;
-});
-
-renderer.domElement.addEventListener('click', () => {
-  renderer.domElement.requestPointerLock();
-});
-
-// 검 공격
-let attacking = false;
-let attackTime = 0;
-let attackCooldown = 0;
-let hasHit = false;
-
-function attack() {
-  if (attacking || attackCooldown > 0) return;
-
-  attacking = true;
-  attackTime = 0;
-  attackCooldown = 0.55;
-  hasHit = false;
-}
-
-renderer.domElement.addEventListener('mousedown', e => {
-  if (e.button === 0) attack();
-});
-
-document.addEventListener('mousemove', e => {
-  if (document.pointerLockElement === renderer.domElement) {
-    angle -= e.movementX * 0.003;
-    pitch = THREE.MathUtils.clamp(
-      pitch + e.movementY * 0.002, -0.2, 0.8
-    );
+  // 시작 위치 주변은 비워둔다
+  if (Math.abs(x) < 12 && Math.abs(z) < 12) {
+    x += 20;
+    z += 20;
   }
+
+  createTree(x, z);
+}
+
+for (let i = 0; i < 25; i++) {
+  let x = (seededRandom() - 0.5) * 180;
+  let z = (seededRandom() - 0.5) * 180;
+
+  createRock(x, z);
+}
+
+// ================================
+// 플레이어
+// ================================
+
+const player = new THREE.Group();
+
+const body = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 1.5, 0.7),
+  new THREE.MeshStandardMaterial({
+    color: 0x3366ff
+  })
+);
+
+body.position.y = 1.5;
+body.castShadow = true;
+player.add(body);
+
+const head = new THREE.Mesh(
+  new THREE.BoxGeometry(0.8, 0.8, 0.8),
+  new THREE.MeshStandardMaterial({
+    color: 0xffcc99
+  })
+);
+
+head.position.y = 2.65;
+head.castShadow = true;
+player.add(head);
+
+const leftArm = new THREE.Mesh(
+  new THREE.BoxGeometry(0.3, 1.2, 0.3),
+  new THREE.MeshStandardMaterial({
+    color: 0x3366ff
+  })
+);
+
+leftArm.position.set(-0.65, 1.5, 0);
+leftArm.castShadow = true;
+player.add(leftArm);
+
+const rightArm = new THREE.Mesh(
+  new THREE.BoxGeometry(0.3, 1.2, 0.3),
+  new THREE.MeshStandardMaterial({
+    color: 0x3366ff
+  })
+);
+
+rightArm.position.set(0.65, 1.5, 0);
+rightArm.castShadow = true;
+player.add(rightArm);
+
+const leftLeg = new THREE.Mesh(
+  new THREE.BoxGeometry(0.35, 1, 0.35),
+  new THREE.MeshStandardMaterial({
+    color: 0x222222
+  })
+);
+
+leftLeg.position.set(-0.25, 0.5, 0);
+leftLeg.castShadow = true;
+player.add(leftLeg);
+
+const rightLeg = new THREE.Mesh(
+  new THREE.BoxGeometry(0.35, 1, 0.35),
+  new THREE.MeshStandardMaterial({
+    color: 0x222222
+  })
+);
+
+rightLeg.position.set(0.25, 0.5, 0);
+rightLeg.castShadow = true;
+player.add(rightLeg);
+
+player.position.set(0, 0, 0);
+
+scene.add(player);
+
+// ================================
+// 검
+// ================================
+
+const sword = new THREE.Group();
+
+const blade = new THREE.Mesh(
+  new THREE.BoxGeometry(0.18, 1.8, 0.08),
+  new THREE.MeshStandardMaterial({
+    color: 0xd8d8d8,
+    metalness: 0.7,
+    roughness: 0.3
+  })
+);
+
+blade.position.y = 0.9;
+sword.add(blade);
+
+const guard = new THREE.Mesh(
+  new THREE.BoxGeometry(0.6, 0.12, 0.12),
+  new THREE.MeshStandardMaterial({
+    color: 0x222222
+  })
+);
+
+guard.position.y = 0.05;
+sword.add(guard);
+
+const handle = new THREE.Mesh(
+  new THREE.BoxGeometry(0.12, 0.6, 0.12),
+  new THREE.MeshStandardMaterial({
+    color: 0x6b3e1e
+  })
+);
+
+handle.position.y = -0.3;
+sword.add(handle);
+
+sword.position.set(0.8, 1.3, 0.2);
+player.add(sword);
+
+// ================================
+// 플레이어 상태
+// ================================
+
+let playerHP = 100;
+const playerMaxHP = 100;
+
+let keys = {};
+
+let attackCooldown = 0;
+let attackAnimation = 0;
+
+const PLAYER_SPEED = 8;
+const ATTACK_DAMAGE = 25;
+const ATTACK_RANGE = 3.5;
+
+// ================================
+// 키보드
+// ================================
+
+window.addEventListener('keydown', (event) => {
+  keys[event.key.toLowerCase()] = true;
 });
 
-// 몬스터 처치 및 재생성
-function defeatSlime() {
-  slimeAlive = false;
-  slime.visible = false;
-  kills++;
-  jelly += 3;
-  updateHUD();
+window.addEventListener('keyup', (event) => {
+  keys[event.key.toLowerCase()] = false;
+});
 
+// ================================
+// 슬라임
+// ================================
+
+const slimes = [];
+
+const MAX_SLIMES = 10;
+const SLIME_MAX_HP = 60;
+
+function createHPBar() {
+  const hpBar = new THREE.Group();
+
+  const background = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.8, 0.18),
+    new THREE.MeshBasicMaterial({
+      color: 0x222222
+    })
+  );
+
+  hpBar.add(background);
+
+  const fill = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.8, 0.14),
+    new THREE.MeshBasicMaterial({
+      color: 0xff3333
+    })
+  );
+
+  fill.position.z = 0.01;
+  hpBar.add(fill);
+
+  hpBar.userData.fill = fill;
+
+  return hpBar;
+}
+
+function createSlime(x, z) {
+  const slime = new THREE.Group();
+
+  const body = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 16, 12),
+    new THREE.MeshStandardMaterial({
+      color: 0x35d05b
+    })
+  );
+
+  body.scale.set(1, 0.8, 1);
+  body.position.y = 0.9;
+  body.castShadow = true;
+
+  slime.add(body);
+
+  // 왼쪽 눈
+  const leftEye = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 8, 8),
+    new THREE.MeshBasicMaterial({
+      color: 0x000000
+    })
+  );
+
+  leftEye.position.set(-0.3, 1.15, -0.8);
+  slime.add(leftEye);
+
+  // 오른쪽 눈
+  const rightEye = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 8, 8),
+    new THREE.MeshBasicMaterial({
+      color: 0x000000
+    })
+  );
+
+  rightEye.position.set(0.3, 1.15, -0.8);
+  slime.add(rightEye);
+
+  // 체력바
+  const hpBar = createHPBar();
+
+  hpBar.position.set(0, 2.2, 0);
+
+  slime.add(hpBar);
+
+  slime.position.set(x, 0, z);
+
+  slime.userData.hp = SLIME_MAX_HP;
+  slime.userData.alive = true;
+  slime.userData.attackCooldown = Math.random();
+  slime.userData.hpBar = hpBar;
+
+  scene.add(slime);
+
+  slimes.push(slime);
+
+  updateSlimeHPBar(slime);
+
+  return slime;
+}
+
+// ================================
+// 슬라임 랜덤 위치
+// ================================
+
+function getRandomWorldPosition() {
+  let x;
+  let z;
+
+  do {
+    x = (Math.random() - 0.5) * 180;
+    z = (Math.random() - 0.5) * 180;
+  } while (
+    Math.sqrt(x * x + z * z) < 12
+  );
+
+  return {
+    x,
+    z
+  };
+}
+
+// ================================
+// 슬라임 체력바
+// ================================
+
+function updateSlimeHPBar(slime) {
+  const hp = Math.max(0, slime.userData.hp);
+  const ratio = hp / SLIME_MAX_HP;
+
+  const fill = slime.userData.hpBar.userData.fill;
+
+  fill.scale.x = ratio;
+  fill.position.x = -0.9 * (1 - ratio);
+
+  slime.userData.hpBar.visible = slime.userData.alive;
+}
+
+// ================================
+// 처음부터 최대 10마리 생성
+// ================================
+
+for (let i = 0; i < MAX_SLIMES; i++) {
+  const position = getRandomWorldPosition();
+
+  createSlime(
+    position.x,
+    position.z
+  );
+}
+
+// ================================
+// 슬라임 처치
+// ================================
+
+function defeatSlime(slime) {
+  slime.userData.alive = false;
+  slime.userData.hp = 0;
+
+  slime.visible = false;
+
+  updateSlimeHPBar(slime);
+
+  // 3초 후 월드의 랜덤 위치에서 부활
   setTimeout(() => {
-    slimeHP = 60;
-    slimeAlive = true;
-    slime.visible = true;
-    updateSlimeBar();
+    const position = getRandomWorldPosition();
+
     slime.position.set(
-      player.position.x + 2,
+      position.x,
       0,
-      player.position.z + 6
+      position.z
     );
-    updateHUD();
+
+    slime.userData.hp = SLIME_MAX_HP;
+    slime.userData.alive = true;
+    slime.userData.attackCooldown = 1;
+
+    slime.visible = true;
+
+    updateSlimeHPBar(slime);
   }, 3000);
 }
 
-// 게임 실행
-const clock = new THREE.Clock();
+// ================================
+// 슬라임 공격
+// ================================
 
-function animate() {
-  requestAnimationFrame(animate);
+function updateSlimes(dt) {
+  for (const slime of slimes) {
+    if (!slime.userData.alive) {
+      continue;
+    }
 
-  const dt = Math.min(clock.getDelta(), 0.05);
+    // 플레이어 방향
+    const direction = new THREE.Vector3();
 
-  // 이동
-  let forward = 0;
-  let side = 0;
+    direction.subVectors(
+      player.position,
+      slime.position
+    );
 
-  if (keys['w']) forward += 1;
-  if (keys['s']) forward -= 1;
-  if (keys['a']) side -= 1;
-  if (keys['d']) side += 1;
+    direction.y = 0;
 
-  const move = new THREE.Vector3(side, 0, forward);
+    const distance = direction.length();
 
-  if (move.length() > 0) {
-    move.normalize();
-    move.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+    // 플레이어가 가까우면 따라옴
+    if (distance > 2) {
+      direction.normalize();
 
-    player.position.addScaledVector(move, 8 * dt);
-    player.rotation.y = Math.atan2(move.x, move.z);
-  }
-
-  // 공격 애니메이션
-  if (attacking) {
-    attackTime += dt;
-    const progress = Math.min(attackTime / 0.35, 1);
-
-    sword.rotation.x = -1.5 + Math.sin(progress * Math.PI) * 2.8;
-    sword.rotation.z = Math.sin(progress * Math.PI) * 0.5;
-
-    // 공격 판정
-    if (progress > 0.25 && progress < 0.7 && !hasHit) {
-      const distance = player.position.distanceTo(slime.position);
-      const direction = new THREE.Vector3(
-        Math.sin(player.rotation.y), 0,
-        Math.cos(player.rotation.y)
+      slime.position.addScaledVector(
+        direction,
+        1.8 * dt
       );
-      const toSlime = new THREE.Vector3()
-        .subVectors(slime.position, player.position)
-        .setY(0)
-        .normalize();
+    }
 
-      const facing = direction.dot(toSlime);
+    // 공격 쿨다운
+    slime.userData.attackCooldown -= dt;
 
-      if (slimeAlive && distance < 3.5 && facing > 0.2) {
-        slimeHP -= 25;
-        hasHit = true;
-        updateSlimeBar();
-        if (slimeHP <= 0) {
-          slimeHP = 0;
-          defeatSlime();
-        }
+    // 플레이어 공격
+    if (
+      distance <= 2 &&
+      slime.userData.attackCooldown <= 0
+    ) {
+      playerHP = Math.max(
+        0,
+        playerHP - 10
+      );
+
+      slime.userData.attackCooldown = 1;
+
+      updateHUD();
+
+      if (playerHP <= 0) {
+        playerHP = 100;
+
+        player.position.set(
+          0,
+          0,
+          0
+        );
 
         updateHUD();
       }
     }
 
-    if (progress >= 1) {
-      attacking = false;
-      sword.rotation.x = 0;
-      sword.rotation.z = 0;
-    }
+    // 슬라임도 월드 밖으로 못 나감
+    slime.position.x = THREE.MathUtils.clamp(
+      slime.position.x,
+      -WORLD_LIMIT,
+      WORLD_LIMIT
+    );
+
+    slime.position.z = THREE.MathUtils.clamp(
+      slime.position.z,
+      -WORLD_LIMIT,
+      WORLD_LIMIT
+    );
+  }
+}
+
+// ================================
+// 공격
+// ================================
+
+window.addEventListener('mousedown', (event) => {
+  if (event.button !== 0) {
+    return;
   }
 
-  attackCooldown = Math.max(0, attackCooldown - dt);
+  if (attackCooldown > 0) {
+    return;
+  }
 
+  attackCooldown = 0.55;
+  attackAnimation = 0.35;
+
+  const playerForward = new THREE.Vector3(
+    0,
+    0,
+    1
+  );
+
+  playerForward.applyQuaternion(
+    player.quaternion
+  );
+
+  for (const slime of slimes) {
+    if (!slime.userData.alive) {
+      continue;
+    }
+
+    const direction = new THREE.Vector3();
+
+    direction.subVectors(
+      slime.position,
+      player.position
+    );
+
+    direction.y = 0;
+
+    const distance = direction.length();
+
+    if (distance > ATTACK_RANGE) {
+      continue;
+    }
+
+    direction.normalize();
+
+    const dot = playerForward.dot(direction);
+
+    if (dot > 0.2) {
+      slime.userData.hp -= ATTACK_DAMAGE;
+
+      updateSlimeHPBar(slime);
+
+      if (slime.userData.hp <= 0) {
+        defeatSlime(slime);
+      }
+    }
+  }
+});
+
+// ================================
+// HUD
+// ================================
+
+function updateHUD() {
+  let hud = document.getElementById('gameHUD');
+
+  if (!hud) {
+    hud = document.createElement('div');
+
+    hud.id = 'gameHUD';
+
+    hud.style.position = 'fixed';
+    hud.style.top = '20px';
+    hud.style.right = '20px';
+    hud.style.padding = '15px';
+    hud.style.background = 'rgba(0,0,0,0.65)';
+    hud.style.color = 'white';
+    hud.style.fontFamily = 'Arial';
+    hud.style.fontSize = '16px';
+    hud.style.borderRadius = '10px';
+    hud.style.zIndex = '100';
+
+    document.body.appendChild(hud);
+  }
+
+  hud.innerHTML = `
+    <b>⚔️ 대장장이의 모험</b>
+    <p>레벨: 1</p>
+    <p>❤️ 플레이어 체력: ${playerHP} / ${playerMaxHP}</p>
+    <p>⚔️ 무기: 나무 검</p>
+    <p>🟢 슬라임: ${slimes.filter(s => s.userData.alive).length} / ${MAX_SLIMES}</p>
+    <p>WASD: 이동</p>
+    <p>마우스: 카메라</p>
+    <p>좌클릭: 공격</p>
+  `;
+}
+
+updateHUD();
+
+// ================================
+// 카메라
+// ================================
+
+let cameraAngle = 0;
+let cameraPitch = 0.45;
+
+let mouseDown = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
+
+renderer.domElement.addEventListener(
+  'mousedown',
+  (event) => {
+    if (event.button === 2) {
+      mouseDown = true;
+
+      lastMouseX = event.clientX;
+      lastMouseY = event.clientY;
+    }
+  }
+);
+
+window.addEventListener(
+  'mouseup',
+  (event) => {
+    if (event.button === 2) {
+      mouseDown = false;
+    }
+  }
+);
+
+window.addEventListener(
+  'mousemove',
+  (event) => {
+    if (!mouseDown) {
+      return;
+    }
+
+    const dx =
+      event.clientX - lastMouseX;
+
+    const dy =
+      event.clientY - lastMouseY;
+
+    cameraAngle -= dx * 0.005;
+
+    cameraPitch -= dy * 0.005;
+
+    cameraPitch = THREE.MathUtils.clamp(
+      cameraPitch,
+      0.2,
+      1.0
+    );
+
+    lastMouseX = event.clientX;
+    lastMouseY = event.clientY;
+  }
+);
+
+renderer.domElement.addEventListener(
+  'contextmenu',
+  (event) => {
+    event.preventDefault();
+  }
+);
+
+// ================================
+// 게임 업데이트
+// ================================
+
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(
+    clock.getDelta(),
+    0.05
+  );
+
+  // ----------------------------
+  // 플레이어 이동
+  // ----------------------------
+
+  const move = new THREE.Vector3();
+
+  if (keys['w']) {
+    move.z -= 1;
+  }
+
+  if (keys['s']) {
+    move.z += 1;
+  }
+
+  if (keys['a']) {
+    move.x -= 1;
+  }
+
+  if (keys['d']) {
+    move.x += 1;
+  }
+
+  if (move.length() > 0) {
+    move.normalize();
+
+    player.position.addScaledVector(
+      move,
+      PLAYER_SPEED * dt
+    );
+
+    player.rotation.y =
+      Math.atan2(move.x, move.z);
+  }
+
+  // ----------------------------
+  // 월드 경계
+  // ----------------------------
+
+  player.position.x =
+    THREE.MathUtils.clamp(
+      player.position.x,
+      -WORLD_LIMIT,
+      WORLD_LIMIT
+    );
+
+  player.position.z =
+    THREE.MathUtils.clamp(
+      player.position.z,
+      -WORLD_LIMIT,
+      WORLD_LIMIT
+    );
+
+  // ----------------------------
+  // 공격
+  // ----------------------------
+
+  attackCooldown = Math.max(
+    0,
+    attackCooldown - dt
+  );
+
+  if (attackAnimation > 0) {
+    attackAnimation -= dt;
+
+    sword.rotation.z =
+      Math.sin(
+        (attackAnimation / 0.35) *
+        Math.PI
+      ) * 1.5;
+  } else {
+    sword.rotation.z = 0;
+  }
+
+  // ----------------------------
+  // 슬라임
+  // ----------------------------
+
+  updateSlimes(dt);
+
+  // ----------------------------
+  // 체력바가 카메라를 바라보게
+  // ----------------------------
+
+  for (const slime of slimes) {
+    slime.userData.hpBar.quaternion.copy(
+      camera.quaternion
+    );
+  }
+
+  // ----------------------------
   // 카메라
-  const distance = 7;
-  const height = 3 + pitch * 3;
+  // ----------------------------
+
+  const cameraDistance = 10;
+
+  const cameraX =
+    player.position.x +
+    Math.sin(cameraAngle) *
+    cameraDistance;
+
+  const cameraZ =
+    player.position.z +
+    Math.cos(cameraAngle) *
+    cameraDistance;
+
+  const cameraY =
+    player.position.y +
+    6;
 
   camera.position.set(
-    player.position.x - Math.sin(angle) * distance,
-    player.position.y + height,
-    player.position.z - Math.cos(angle) * distance
+    cameraX,
+    cameraY,
+    cameraZ
   );
 
   camera.lookAt(
     player.position.x,
-    player.position.y + 1.2,
+    player.position.y + 1,
     player.position.z
   );
-  hpBar.quaternion.copy(camera.quaternion);
 
-  renderer.render(scene, camera);
+  renderer.render(
+    scene,
+    camera
+  );
 }
 
 animate();
 
+// ================================
 // 화면 크기 변경
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+// ================================
+
+window.addEventListener(
+  'resize',
+  () => {
+    camera.aspect =
+      window.innerWidth /
+      window.innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+      window.innerWidth,
+      window.innerHeight
+    );
+  }
+);

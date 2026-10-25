@@ -71,9 +71,6 @@ document.getElementById('landscapeButton').addEventListener('click', async () =>
   updateOrientation();
 });
 
-window.addEventListener('resize', updateOrientation);
-window.addEventListener('orientationchange', updateOrientation);
-
 // 기본 설정
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
@@ -166,13 +163,19 @@ playerHPBar.position.set(0, 2.8, 0);
 
 const playerHPBackground = new THREE.Mesh(
   new THREE.PlaneGeometry(1.8, 0.18),
-  new THREE.MeshBasicMaterial({ color: 0x222222, side: THREE.DoubleSide })
+  new THREE.MeshBasicMaterial({
+    color: 0x222222,
+    side: THREE.DoubleSide
+  })
 );
 playerHPBar.add(playerHPBackground);
 
 const playerHPFill = new THREE.Mesh(
   new THREE.PlaneGeometry(1.8, 0.14),
-  new THREE.MeshBasicMaterial({ color: 0x35dd55, side: THREE.DoubleSide })
+  new THREE.MeshBasicMaterial({
+    color: 0x35dd55,
+    side: THREE.DoubleSide
+  })
 );
 playerHPFill.position.z = 0.01;
 playerHPBar.add(playerHPFill);
@@ -333,7 +336,7 @@ function updateSlimeBar(slime) {
   slime.hpBar.visible = slime.alive;
 }
 
-// HUD
+// 전투정보 창
 const hud = document.createElement('div');
 hud.style.cssText = `
   position:fixed;
@@ -351,10 +354,11 @@ hud.style.cssText = `
 `;
 document.body.appendChild(hud);
 
+// 모바일에서는 오른쪽 위에 작게 배치
 if (isMobile) {
-  hud.style.left = '12px';
-  hud.style.right = 'auto';
-  hud.style.top = '8px';
+  hud.style.left = 'auto';
+  hud.style.right = '12px';
+  hud.style.top = '12px';
   hud.style.padding = '6px 9px';
   hud.style.minWidth = '120px';
   hud.style.fontSize = '11px';
@@ -399,6 +403,7 @@ renderer.domElement.addEventListener('click', () => {
   }
 });
 
+// PC 마우스 카메라 회전
 document.addEventListener('mousemove', e => {
   if (document.pointerLockElement === renderer.domElement) {
     angle -= e.movementX * 0.003;
@@ -624,8 +629,6 @@ function animate() {
   if (playerAlive) {
     if (keys['w']) forward += 1;
     if (keys['s']) forward -= 1;
-
-    // A와 D 좌우 방향
     if (keys['a']) side -= 1;
     if (keys['d']) side += 1;
 
@@ -635,7 +638,7 @@ function animate() {
     }
   }
 
-  // 카메라 기준 좌우 방향 보정
+  // 좌우 이동 방향 보정
   const move = new THREE.Vector3(-side, 0, forward);
 
   if (move.length() > 1) move.normalize();

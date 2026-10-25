@@ -1,4 +1,3 @@
-
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 
 // 화면 설정
@@ -407,7 +406,7 @@ updatePlayerBar();
 // 키보드와 카메라
 const keys = {};
 let angle = 0;
-let pitch = 0.3;
+let pitch = 0.48;
 
 window.addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
@@ -683,32 +682,45 @@ function animate() {
   player.position.x = THREE.MathUtils.clamp(player.position.x, -95, 95);
   player.position.z = THREE.MathUtils.clamp(player.position.z, -95, 95);
 
-  // 검 공격 애니메이션
+  // 검 공격 애니메이션: 뒤로 들기 -> 빠른 베기 -> 원래 자세
   if (attacking) {
     attackTime += dt;
     const progress = Math.min(attackTime / 0.52, 1);
 
-    // 처음에는 검을 뒤로 들고, 중간에는 빠르게 앞으로 휘두른다.
     if (progress < 0.28) {
       const windup = progress / 0.28;
       sword.rotation.x = -0.25 - windup * 0.75;
       sword.rotation.z = -windup * 0.95;
-      sword.position.set(0.75 - windup * 0.12, 1.15 + windup * 0.12, 0.15 - windup * 0.18);
+      sword.position.set(
+        0.75 - windup * 0.12,
+        1.15 + windup * 0.12,
+        0.15 - windup * 0.18
+      );
     } else if (progress < 0.68) {
       const swing = (progress - 0.28) / 0.4;
       sword.rotation.x = -1 + swing * 2.15;
       sword.rotation.z = -0.95 + swing * 2.0;
-      sword.position.set(0.63 + swing * 0.22, 1.27 - swing * 0.18, -0.03 + swing * 0.18);
+      sword.position.set(
+        0.63 + swing * 0.22,
+        1.27 - swing * 0.18,
+        -0.03 + swing * 0.18
+      );
     } else {
       const recovery = (progress - 0.68) / 0.32;
       sword.rotation.x = 1.15 * (1 - recovery);
       sword.rotation.z = 1.05 * (1 - recovery);
-      sword.position.set(0.85 - recovery * 0.10, 1.09 + recovery * 0.06, 0.33 - recovery * 0.18);
+      sword.position.set(
+        0.85 - recovery * 0.10,
+        1.09 + recovery * 0.06,
+        0.33 - recovery * 0.18
+      );
     }
 
-    // 실제 검이 휘둘러지는 순간에만 베기 효과를 표시한다.
     slashEffect.visible = progress > 0.28 && progress < 0.72;
-    slashEffect.material.opacity = Math.max(0, 0.9 - Math.abs(progress - 0.5) * 2.2);
+    slashEffect.material.opacity = Math.max(
+      0,
+      0.9 - Math.abs(progress - 0.5) * 2.2
+    );
 
     if (progress > 0.32 && progress < 0.68 && !hasHit) {
       let target = null;
@@ -724,7 +736,6 @@ function animate() {
         if (!slime.alive) continue;
 
         const distance = player.position.distanceTo(slime.group.position);
-
         const toSlime = new THREE.Vector3()
           .subVectors(slime.group.position, player.position)
           .setY(0)
@@ -742,7 +753,6 @@ function animate() {
         target.hp -= 25;
         target.aggro = true;
         hasHit = true;
-
         updateSlimeBar(target);
 
         if (target.hp <= 0) {
@@ -763,14 +773,12 @@ function animate() {
   }
 
   attackCooldown = Math.max(0, attackCooldown - dt);
-  if (!attacking) slashEffect.visible = false;
 
-  // 슬라임 행동
+  // 슬라임 행동과 점프 공격 모션
   for (const slime of slimes) {
     if (!slime.alive) continue;
 
     slime.hpBar.visible = true;
-
     if (!slime.aggro) continue;
 
     slime.attackCooldown = Math.max(0, slime.attackCooldown - dt);
@@ -780,7 +788,6 @@ function animate() {
     toPlayer.y = 0;
     const distance = toPlayer.length();
 
-    // 슬라임 공격 모션: 몸을 낮춤 -> 앞으로 점프 -> 잠깐 회복
     if (slime.attackPhase !== 'idle') {
       slime.attackAnimationTime += dt;
 
@@ -789,6 +796,7 @@ function animate() {
           slime.body.scale.y, 0.48, Math.min(1, dt * 12)
         );
         slime.body.position.y = 0.55;
+
         if (slime.attackAnimationTime >= 0.22) {
           slime.attackPhase = 'lunge';
           slime.attackAnimationTime = 0;
@@ -813,6 +821,7 @@ function animate() {
             }
             updateHUD();
           }
+
           slime.attackPhase = 'recover';
           slime.attackAnimationTime = 0;
         }
@@ -823,6 +832,7 @@ function animate() {
         slime.body.position.y = THREE.MathUtils.lerp(
           slime.body.position.y, 0.7, Math.min(1, dt * 8)
         );
+
         if (slime.attackAnimationTime >= 0.38) {
           slime.attackPhase = 'idle';
           slime.attackAnimationTime = 0;
@@ -845,9 +855,9 @@ function animate() {
     }
   }
 
-  // 카메라
-  const cameraDistance = 7;
-  const height = 3 + pitch * 3;
+  // 카메라: 살짝 높은 곳에서 내려다보는 시점
+  const cameraDistance = 7.5;
+  const height = 4.2 + pitch * 3;
 
   camera.position.set(
     player.position.x - Math.sin(angle) * cameraDistance,
@@ -857,7 +867,7 @@ function animate() {
 
   camera.lookAt(
     player.position.x,
-    player.position.y + 1.2,
+    player.position.y + 1.0,
     player.position.z
   );
 

@@ -195,6 +195,22 @@ makePart(sword, [0.14, 0.8, 0.12], 0xaaaaaa, 0, 0.5, 0);
 makePart(sword, [0.3, 0.1, 0.15], 0x8b5a2b, 0, 0.05, 0);
 makePart(sword, [0.12, 0.35, 0.12], 0x79502b, 0, -0.17, 0);
 
+// 검 휘두르기 때 나타나는 흰색 베기 효과
+const slashEffect = new THREE.Mesh(
+  new THREE.TorusGeometry(0.9, 0.045, 6, 28, Math.PI * 1.35),
+  new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.9,
+    depthWrite: false
+  })
+);
+slashEffect.position.set(0, 1.25, 1.15);
+slashEffect.rotation.set(0, 0, -0.55);
+slashEffect.visible = false;
+slashEffect.renderOrder = 20;
+player.add(slashEffect);
+
 // 나무 생성
 function createTree(x, z) {
   const tree = new THREE.Group();
@@ -316,12 +332,17 @@ function createSlime() {
 
   return {
     group: slime,
+    body,
     hpBar,
     hpFill: fill,
     hp: 60,
     alive: true,
     aggro: false,
-    attackCooldown: 0
+    attackCooldown: 0,
+    attackPhase: 'idle',
+    attackAnimationTime: 0,
+    attackDirection: new THREE.Vector3(),
+    attackHit: false
   };
 }
 
@@ -451,6 +472,11 @@ function defeatSlime(slime) {
     slime.alive = true;
     slime.aggro = false;
     slime.attackCooldown = 0;
+    slime.attackPhase = 'idle';
+    slime.attackAnimationTime = 0;
+    slime.attackHit = false;
+    slime.body.scale.y = 0.8;
+    slime.body.position.y = 0.7;
     slime.group.position.copy(getRandomSpawnPosition());
     slime.group.visible = true;
 
@@ -660,12 +686,31 @@ function animate() {
   // 검 공격 애니메이션
   if (attacking) {
     attackTime += dt;
-    const progress = Math.min(attackTime / 0.35, 1);
+    const progress = Math.min(attackTime / 0.52, 1);
 
-    sword.rotation.x = -1.5 + Math.sin(progress * Math.PI) * 2.8;
-    sword.rotation.z = Math.sin(progress * Math.PI) * 0.5;
+    // 처음에는 검을 뒤로 들고, 중간에는 빠르게 앞으로 휘두른다.
+    if (progress < 0.28) {
+      const windup = progress / 0.28;
+      sword.rotation.x = -0.25 - windup * 0.75;
+      sword.rotation.z = -windup * 0.95;
+      sword.position.set(0.75 - windup * 0.12, 1.15 + windup * 0.12, 0.15 - windup * 0.18);
+    } else if (progress < 0.68) {
+      const swing = (progress - 0.28) / 0.4;
+      sword.rotation.x = -1 + swing * 2.15;
+      sword.rotation.z = -0.95 + swing * 2.0;
+      sword.position.set(0.63 + swing * 0.22, 1.27 - swing * 0.18, -0.03 + swing * 0.18);
+    } else {
+      const recovery = (progress - 0.68) / 0.32;
+      sword.rotation.x = 1.15 * (1 - recovery);
+      sword.rotation.z = 1.05 * (1 - recovery);
+      sword.position.set(0.85 - recovery * 0.10, 1.09 + recovery * 0.06, 0.33 - recovery * 0.18);
+    }
 
-    if (progress > 0.25 && progress < 0.7 && !hasHit) {
+    // 실제 검이 휘둘러지는 순간에만 베기 효과를 표시한다.
+    slashEffect.visible = progress > 0.28 && progress < 0.72;
+    slashEffect.material.opacity = Math.max(0, 0.9 - Math.abs(progress - 0.5) * 2.2);
+
+    if (progress > 0.32 && progress < 0.68 && !hasHit) {
       let target = null;
       let closestDistance = 3.5;
 
@@ -711,12 +756,14 @@ function animate() {
 
     if (progress >= 1) {
       attacking = false;
-      sword.rotation.x = 0;
-      sword.rotation.z = 0;
+      sword.rotation.set(0, 0, 0);
+      sword.position.set(0.75, 1.15, 0.15);
+      slashEffect.visible = false;
     }
   }
 
   attackCooldown = Math.max(0, attackCooldown - dt);
+  if (!attacking) slashEffect.visible = false;
 
   // 슬라임 행동
   for (const slime of slimes) {
@@ -730,32 +777,71 @@ function animate() {
 
     const toPlayer = new THREE.Vector3()
       .subVectors(player.position, slime.group.position);
-
     toPlayer.y = 0;
     const distance = toPlayer.length();
+
+    // 슬라임 공격 모션: 몸을 낮춤 -> 앞으로 점프 -> 잠깐 회복
+    if (slime.attackPhase !== 'idle') {
+      slime.attackAnimationTime += dt;
+
+      if (slime.attackPhase === 'windup') {
+        slime.body.scale.y = THREE.MathUtils.lerp(
+          slime.body.scale.y, 0.48, Math.min(1, dt * 12)
+        );
+        slime.body.position.y = 0.55;
+        if (slime.attackAnimationTime >= 0.22) {
+          slime.attackPhase = 'lunge';
+          slime.attackAnimationTime = 0;
+        }
+      } else if (slime.attackPhase === 'lunge') {
+        slime.group.position.addScaledVector(slime.attackDirection, 4.2 * dt);
+        slime.body.scale.y = THREE.MathUtils.lerp(
+          slime.body.scale.y, 1.0, Math.min(1, dt * 10)
+        );
+        slime.body.position.y = 0.82;
+
+        if (slime.attackAnimationTime >= 0.28) {
+          if (playerAlive && slime.group.position.distanceTo(player.position) < 2.3) {
+            playerHP = Math.max(0, playerHP - 3);
+            updatePlayerBar();
+
+            if (playerHP <= 0) {
+              playerHP = 0;
+              playerAlive = false;
+              document.exitPointerLock();
+              updatePlayerBar();
+            }
+            updateHUD();
+          }
+          slime.attackPhase = 'recover';
+          slime.attackAnimationTime = 0;
+        }
+      } else if (slime.attackPhase === 'recover') {
+        slime.body.scale.y = THREE.MathUtils.lerp(
+          slime.body.scale.y, 0.8, Math.min(1, dt * 8)
+        );
+        slime.body.position.y = THREE.MathUtils.lerp(
+          slime.body.position.y, 0.7, Math.min(1, dt * 8)
+        );
+        if (slime.attackAnimationTime >= 0.38) {
+          slime.attackPhase = 'idle';
+          slime.attackAnimationTime = 0;
+        }
+      }
+      continue;
+    }
 
     if (distance > 1.5) {
       toPlayer.normalize();
       slime.group.position.addScaledVector(toPlayer, 1.6 * dt);
-
-      slime.group.rotation.y = Math.atan2(
-        -toPlayer.x,
-        -toPlayer.z
-      );
+      slime.group.rotation.y = Math.atan2(-toPlayer.x, -toPlayer.z);
     } else if (playerAlive && slime.attackCooldown <= 0) {
-      playerHP = Math.max(0, playerHP - 3);
+      slime.attackPhase = 'windup';
+      slime.attackAnimationTime = 0;
       slime.attackCooldown = 1.5;
-
-      updatePlayerBar();
-
-      if (playerHP <= 0) {
-        playerHP = 0;
-        playerAlive = false;
-        document.exitPointerLock();
-        updatePlayerBar();
-      }
-
-      updateHUD();
+      slime.attackHit = false;
+      slime.attackDirection.copy(toPlayer).normalize();
+      slime.group.rotation.y = Math.atan2(-toPlayer.x, -toPlayer.z);
     }
   }
 

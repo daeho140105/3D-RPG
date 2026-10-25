@@ -17,6 +17,63 @@ document.body.style.userSelect = 'none';
 
 const isMobile = window.matchMedia('(pointer: coarse)').matches;
 
+// 모바일 가로 화면 안내
+const rotateScreen = document.createElement('div');
+rotateScreen.style.cssText = `
+  position:fixed;
+  inset:0;
+  background:#17202a;
+  color:white;
+  z-index:1000;
+  display:none;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  font-family:sans-serif;
+  padding:20px;
+`;
+
+rotateScreen.innerHTML = `
+  <div style="font-size:55px">📱 ↻</div>
+  <h2>가로 화면으로 플레이해 주세요!</h2>
+  <p>아래 버튼을 눌러 가로 화면으로 전환하세요.</p>
+  <button id="landscapeButton"
+    style="padding:15px 25px;border:0;border-radius:12px;
+    background:#39a852;color:white;font-size:18px;font-weight:bold">
+    가로 화면으로 전환
+  </button>
+`;
+
+document.body.appendChild(rotateScreen);
+
+function updateOrientation() {
+  if (isMobile && window.innerHeight > window.innerWidth) {
+    rotateScreen.style.display = 'flex';
+  } else {
+    rotateScreen.style.display = 'none';
+  }
+}
+
+document.getElementById('landscapeButton').addEventListener('click', async () => {
+  try {
+    if (document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen();
+    }
+  } catch (e) {}
+
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      await screen.orientation.lock('landscape');
+    }
+  } catch (e) {}
+
+  updateOrientation();
+});
+
+window.addEventListener('resize', updateOrientation);
+window.addEventListener('orientationchange', updateOrientation);
+
 // 기본 설정
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
@@ -109,13 +166,13 @@ playerHPBar.position.set(0, 2.8, 0);
 
 const playerHPBackground = new THREE.Mesh(
   new THREE.PlaneGeometry(1.8, 0.18),
-  new THREE.MeshBasicMaterial({ color: 0x222222 })
+  new THREE.MeshBasicMaterial({ color: 0x222222, side: THREE.DoubleSide })
 );
 playerHPBar.add(playerHPBackground);
 
 const playerHPFill = new THREE.Mesh(
   new THREE.PlaneGeometry(1.8, 0.14),
-  new THREE.MeshBasicMaterial({ color: 0x35dd55 })
+  new THREE.MeshBasicMaterial({ color: 0x35dd55, side: THREE.DoubleSide })
 );
 playerHPFill.position.z = 0.01;
 playerHPBar.add(playerHPFill);
@@ -135,7 +192,7 @@ makePart(sword, [0.14, 0.8, 0.12], 0xaaaaaa, 0, 0.5, 0);
 makePart(sword, [0.3, 0.1, 0.15], 0x8b5a2b, 0, 0.05, 0);
 makePart(sword, [0.12, 0.35, 0.12], 0x79502b, 0, -0.17, 0);
 
-// 나무
+// 나무 생성
 function createTree(x, z) {
   const tree = new THREE.Group();
 
@@ -183,7 +240,7 @@ for (let i = 0; i < 20; i++) {
   scene.add(rock);
 }
 
-// 슬라임 설정
+// 슬라임
 const MAX_SLIMES = 10;
 const slimes = [];
 let kills = 0;
@@ -197,7 +254,6 @@ function getRandomSpawnPosition() {
   );
 }
 
-// 슬라임 생성
 function createSlime() {
   const slime = new THREE.Group();
   scene.add(slime);
@@ -228,22 +284,31 @@ function createSlime() {
   mouth.position.set(0, 0.59, -0.77);
   slime.add(mouth);
 
-  // 슬라임 체력바
   const hpBar = new THREE.Group();
   slime.add(hpBar);
   hpBar.position.set(0, 2, 0);
 
   const background = new THREE.Mesh(
     new THREE.PlaneGeometry(1.8, 0.18),
-    new THREE.MeshBasicMaterial({ color: 0x222222 })
+    new THREE.MeshBasicMaterial({
+      color: 0x222222,
+      side: THREE.DoubleSide,
+      depthTest: false
+    })
   );
+  background.renderOrder = 10;
   hpBar.add(background);
 
   const fill = new THREE.Mesh(
     new THREE.PlaneGeometry(1.8, 0.14),
-    new THREE.MeshBasicMaterial({ color: 0xff3333 })
+    new THREE.MeshBasicMaterial({
+      color: 0xff3333,
+      side: THREE.DoubleSide,
+      depthTest: false
+    })
   );
   fill.position.z = 0.01;
+  fill.renderOrder = 11;
   hpBar.add(fill);
 
   return {
@@ -265,8 +330,6 @@ function updateSlimeBar(slime) {
   const ratio = Math.max(0, slime.hp / 60);
   slime.hpFill.scale.x = ratio;
   slime.hpFill.position.x = -0.9 * (1 - ratio);
-
-  // 살아 있는 슬라임의 체력바는 계속 표시
   slime.hpBar.visible = slime.alive;
 }
 
@@ -274,34 +337,42 @@ function updateSlimeBar(slime) {
 const hud = document.createElement('div');
 hud.style.cssText = `
   position:fixed;
-  top:15px;
-  right:15px;
+  top:12px;
+  right:12px;
   background:#222d;
   color:white;
-  padding:15px;
-  border-radius:12px;
+  padding:10px;
+  border-radius:10px;
   z-index:5;
   font-family:sans-serif;
-  min-width:160px;
-  font-size:14px;
+  min-width:140px;
+  font-size:13px;
   pointer-events:none;
 `;
 document.body.appendChild(hud);
+
+if (isMobile) {
+  hud.style.left = '12px';
+  hud.style.right = 'auto';
+  hud.style.top = '8px';
+  hud.style.padding = '6px 9px';
+  hud.style.minWidth = '120px';
+  hud.style.fontSize = '11px';
+}
 
 function updateHUD() {
   const aliveCount = slimes.filter(s => s.alive).length;
 
   hud.innerHTML = `
     <b>⚔️ 전투 정보</b>
-    <p>플레이어 체력: ${playerHP} / 100</p>
-    <div style="width:160px;height:12px;background:#555;border-radius:8px;overflow:hidden">
+    <p style="margin:5px 0">플레이어 체력: ${playerHP} / 100</p>
+    <div style="width:100%;height:9px;background:#555;border-radius:8px;overflow:hidden">
       <div style="width:${playerHP}%;height:100%;background:#35d45b"></div>
     </div>
-    <p>슬라임 생존 수: ${aliveCount} / 10</p>
-    <p>처치 수: ${kills}</p>
-    <p>슬라임 젤리: ${jelly}개</p>
-    <p>무기: 나무 검</p>
-    ${playerAlive ? '' : '<h3 style="color:#ff5555">체력이 모두 소진되었습니다!</h3>'}
+    <p style="margin:5px 0">슬라임 생존: ${aliveCount} / 10</p>
+    <p style="margin:5px 0">처치 수: ${kills}</p>
+    <p style="margin:5px 0">젤리: ${jelly}개</p>
+    ${playerAlive ? '' : '<b style="color:#ff5555">체력이 모두 소진되었습니다!</b>'}
   `;
 }
 
@@ -328,7 +399,6 @@ renderer.domElement.addEventListener('click', () => {
   }
 });
 
-// PC 마우스 카메라 회전
 document.addEventListener('mousemove', e => {
   if (document.pointerLockElement === renderer.domElement) {
     angle -= e.movementX * 0.003;
@@ -354,7 +424,6 @@ function attack() {
   hasHit = false;
 }
 
-// PC 좌클릭 공격
 renderer.domElement.addEventListener('mousedown', e => {
   if (!isMobile && e.button === 0) {
     attack();
@@ -390,9 +459,9 @@ const joystickBase = document.createElement('div');
 joystickBase.style.cssText = `
   position:fixed;
   left:25px;
-  bottom:30px;
-  width:130px;
-  height:130px;
+  bottom:25px;
+  width:125px;
+  height:125px;
   border-radius:50%;
   background:#ffffff55;
   border:3px solid #ffffffaa;
@@ -406,8 +475,8 @@ joystickKnob.style.cssText = `
   position:absolute;
   width:55px;
   height:55px;
-  left:37px;
-  top:37px;
+  left:35px;
+  top:35px;
   border-radius:50%;
   background:#ffffffcc;
   border:2px solid #777;
@@ -422,14 +491,14 @@ attackButton.textContent = '⚔️ 공격';
 attackButton.style.cssText = `
   position:fixed;
   right:30px;
-  bottom:45px;
-  width:95px;
-  height:95px;
+  bottom:35px;
+  width:90px;
+  height:90px;
   border-radius:50%;
   border:3px solid white;
   background:#d94b35dd;
   color:white;
-  font-size:19px;
+  font-size:18px;
   font-weight:bold;
   z-index:10;
   display:none;
@@ -460,7 +529,7 @@ joystickBase.addEventListener('pointermove', e => {
   let x = e.clientX - (rect.left + rect.width / 2);
   let y = e.clientY - (rect.top + rect.height / 2);
 
-  const maxDistance = 42;
+  const maxDistance = 40;
   const length = Math.sqrt(x * x + y * y);
 
   if (length > maxDistance) {
@@ -470,16 +539,17 @@ joystickBase.addEventListener('pointermove', e => {
 
   joystickX = x / maxDistance;
   joystickY = y / maxDistance;
-  joystickKnob.style.left = `${37 + x}px`;
-  joystickKnob.style.top = `${37 + y}px`;
+
+  joystickKnob.style.left = `${35 + x}px`;
+  joystickKnob.style.top = `${35 + y}px`;
 });
 
 function resetJoystick() {
   joystickPointer = null;
   joystickX = 0;
   joystickY = 0;
-  joystickKnob.style.left = '37px';
-  joystickKnob.style.top = '37px';
+  joystickKnob.style.left = '35px';
+  joystickKnob.style.top = '35px';
 }
 
 joystickBase.addEventListener('pointerup', resetJoystick);
@@ -548,13 +618,14 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  // 이동
   let forward = 0;
   let side = 0;
 
   if (playerAlive) {
     if (keys['w']) forward += 1;
     if (keys['s']) forward -= 1;
+
+    // A와 D 좌우 방향
     if (keys['a']) side -= 1;
     if (keys['d']) side += 1;
 
@@ -564,7 +635,8 @@ function animate() {
     }
   }
 
-  const move = new THREE.Vector3(side, 0, forward);
+  // 카메라 기준 좌우 방향 보정
+  const move = new THREE.Vector3(-side, 0, forward);
 
   if (move.length() > 1) move.normalize();
 
@@ -647,7 +719,6 @@ function animate() {
   for (const slime of slimes) {
     if (!slime.alive) continue;
 
-    // 살아 있는 동안 체력바 표시 유지
     slime.hpBar.visible = true;
 
     if (!slime.aggro) continue;
@@ -701,7 +772,6 @@ function animate() {
     player.position.z
   );
 
-  // 체력바가 카메라를 바라보게 함
   faceHealthBar(player, playerHPBar);
 
   for (const slime of slimes) {
@@ -718,4 +788,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  updateOrientation();
 });
+
+updateOrientation();

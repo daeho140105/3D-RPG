@@ -210,7 +210,10 @@ slashEffect.visible = false;
 slashEffect.renderOrder = 20;
 player.add(slashEffect);
 
-// 나무 생성
+// 나무 채집 시스템
+let wood = 0;
+const trees = [];
+
 function createTree(x, z) {
   const tree = new THREE.Group();
 
@@ -232,6 +235,13 @@ function createTree(x, z) {
 
   tree.position.set(x, 0, z);
   scene.add(tree);
+
+  trees.push({
+    group: tree,
+    hp: 3,
+    alive: true,
+    respawnTimer: 0
+  });
 }
 
 for (let i = 0; i < 45; i++) {
@@ -356,7 +366,7 @@ function updateSlimeBar(slime) {
   slime.hpBar.visible = slime.alive;
 }
 
-// 전투정보 창
+// UI
 const hud = document.createElement('div');
 hud.style.cssText = `
   position:fixed;
@@ -368,40 +378,148 @@ hud.style.cssText = `
   border-radius:10px;
   z-index:5;
   font-family:sans-serif;
-  min-width:140px;
+  min-width:160px;
   font-size:13px;
   pointer-events:none;
 `;
 document.body.appendChild(hud);
 
-// 모바일에서는 오른쪽 위에 작게 배치
 if (isMobile) {
-  hud.style.left = 'auto';
   hud.style.right = '12px';
   hud.style.top = '12px';
   hud.style.padding = '6px 9px';
-  hud.style.minWidth = '120px';
+  hud.style.minWidth = '135px';
   hud.style.fontSize = '11px';
 }
 
+// 제작 UI
+const craftPanel = document.createElement('div');
+craftPanel.style.cssText = `
+  position:fixed;
+  left:50%;
+  bottom:18px;
+  transform:translateX(-50%);
+  background:#33271ddd;
+  color:white;
+  padding:12px 16px;
+  border:2px solid #c99a55;
+  border-radius:12px;
+  z-index:15;
+  font-family:sans-serif;
+  text-align:center;
+  min-width:220px;
+`;
+craftPanel.innerHTML = `
+  <b style="font-size:17px">⚒️ 대장간</b>
+  <div id="materialInfo" style="margin:8px 0;line-height:1.6"></div>
+  <button id="craftSlimeSword"
+    style="padding:9px 16px;border:0;border-radius:8px;
+    background:#5cae55;color:white;font-weight:bold;font-size:14px">
+    슬라임검 제작
+  </button>
+  <div id="craftMessage" style="margin-top:6px;font-size:12px"></div>
+`;
+document.body.appendChild(craftPanel);
+
+if (isMobile) {
+  craftPanel.style.bottom = '12px';
+  craftPanel.style.padding = '7px 10px';
+  craftPanel.style.minWidth = '180px';
+  craftPanel.style.fontSize = '12px';
+}
+
+function updateCraftUI() {
+  const materialInfo = document.getElementById('materialInfo');
+  const craftButton = document.getElementById('craftSlimeSword');
+
+  materialInfo.innerHTML = `
+    🪵 나무: <b>${wood} / 3</b><br>
+    🟢 젤리: <b>${jelly} / 20</b>
+  `;
+
+  craftButton.disabled = wood < 3 || jelly < 20 || hasSlimeSword;
+  craftButton.style.opacity = craftButton.disabled ? '0.5' : '1';
+  craftButton.textContent = hasSlimeSword ? '슬라임검 제작 완료' : '슬라임검 제작';
+}
+
+// 검 종류
+let currentSword = 'wooden';
+let swordDamage = 25;
+let hasSlimeSword = false;
+
+function equipSlimeSword() {
+  while (sword.children.length > 0) {
+    sword.remove(sword.children[0]);
+  }
+
+  // 슬라임검: 초록색 칼날과 젤리 장식
+  makePart(sword, [0.2, 1.05, 0.16], 0x35e85a, 0, 0.58, 0);
+  makePart(sword, [0.32, 0.13, 0.2], 0x8b5a2b, 0, 0.05, 0);
+  makePart(sword, [0.13, 0.38, 0.13], 0x79502b, 0, -0.18, 0);
+
+  const gem = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 12, 12),
+    new THREE.MeshStandardMaterial({
+      color: 0x7dff91,
+      emissive: 0x1b8c37,
+      emissiveIntensity: 0.6
+    })
+  );
+  gem.position.set(0, 0.05, 0.13);
+  sword.add(gem);
+
+  currentSword = 'slime';
+  swordDamage = 40;
+}
+
+// 슬라임검 제작
+document.getElementById('craftSlimeSword').addEventListener('click', () => {
+  const message = document.getElementById('craftMessage');
+
+  if (hasSlimeSword) {
+    message.textContent = '이미 슬라임검을 만들었어!';
+    return;
+  }
+
+  if (wood < 3 || jelly < 20) {
+    message.textContent = '재료가 부족해!';
+    return;
+  }
+
+  wood -= 3;
+  jelly -= 20;
+  hasSlimeSword = true;
+
+  equipSlimeSword();
+
+  message.style.color = '#9cff9c';
+  message.textContent = '슬라임검 제작 성공!';
+  updateCraftUI();
+  updateHUD();
+});
+
+// HUD 갱신
 function updateHUD() {
   const aliveCount = slimes.filter(s => s.alive).length;
 
   hud.innerHTML = `
     <b>⚔️ 전투 정보</b>
-    <p style="margin:5px 0">플레이어 체력: ${playerHP} / 100</p>
+    <p style="margin:5px 0">체력: ${playerHP} / 100</p>
     <div style="width:100%;height:9px;background:#555;border-radius:8px;overflow:hidden">
       <div style="width:${playerHP}%;height:100%;background:#35d45b"></div>
     </div>
     <p style="margin:5px 0">슬라임 생존: ${aliveCount} / 10</p>
     <p style="margin:5px 0">처치 수: ${kills}</p>
-    <p style="margin:5px 0">젤리: ${jelly}개</p>
+    <p style="margin:5px 0">🟢 젤리: ${jelly}개</p>
+    <p style="margin:5px 0">🪵 나무: ${wood}개</p>
+    <p style="margin:5px 0">검 공격력: ${swordDamage}</p>
     ${playerAlive ? '' : '<b style="color:#ff5555">체력이 모두 소진되었습니다!</b>'}
   `;
 }
 
 updateHUD();
 updatePlayerBar();
+updateCraftUI();
 
 // 키보드와 카메라
 const keys = {};
@@ -455,6 +573,83 @@ renderer.domElement.addEventListener('mousedown', e => {
   }
 });
 
+// 나무 채집
+function hitTree() {
+  let targetTree = null;
+  let closestDistance = 3.5;
+
+  for (const tree of trees) {
+    if (!tree.alive) continue;
+
+    const distance = player.position.distanceTo(tree.group.position);
+
+    const direction = new THREE.Vector3(
+      Math.sin(player.rotation.y),
+      0,
+      Math.cos(player.rotation.y)
+    );
+
+    const toTree = new THREE.Vector3()
+      .subVectors(tree.group.position, player.position)
+      .setY(0)
+      .normalize();
+
+    const facing = direction.dot(toTree);
+
+    if (distance < closestDistance && facing > 0.2) {
+      closestDistance = distance;
+      targetTree = tree;
+    }
+  }
+
+  if (!targetTree) return false;
+
+  targetTree.hp--;
+
+  if (targetTree.hp <= 0) {
+    targetTree.alive = false;
+    targetTree.group.visible = false;
+    wood++;
+    targetTree.respawnTimer = 15;
+
+    updateHUD();
+    updateCraftUI();
+
+    showMessage('🪵 나무 1개 획득!');
+  } else {
+    showMessage(`나무 내구도: ${targetTree.hp} / 3`);
+  }
+
+  return true;
+}
+
+// 안내 메시지
+const messageBox = document.createElement('div');
+messageBox.style.cssText = `
+  position:fixed;
+  left:50%;
+  top:20%;
+  transform:translateX(-50%);
+  background:#222d;
+  color:white;
+  padding:10px 18px;
+  border-radius:10px;
+  font-family:sans-serif;
+  font-weight:bold;
+  z-index:20;
+  pointer-events:none;
+  display:none;
+`;
+document.body.appendChild(messageBox);
+
+let messageTimer = 0;
+
+function showMessage(message) {
+  messageBox.textContent = message;
+  messageBox.style.display = 'block';
+  messageTimer = 1.5;
+}
+
 // 슬라임 처치 및 재소환
 function defeatSlime(slime) {
   slime.alive = false;
@@ -465,6 +660,9 @@ function defeatSlime(slime) {
   kills++;
   jelly += 3;
   updateHUD();
+  updateCraftUI();
+
+  showMessage('🟢 젤리 3개 획득!');
 
   setTimeout(() => {
     slime.hp = 60;
@@ -648,6 +846,26 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
 
+  if (messageTimer > 0) {
+    messageTimer -= dt;
+    if (messageTimer <= 0) {
+      messageBox.style.display = 'none';
+    }
+  }
+
+  // 나무 재생성
+  for (const tree of trees) {
+    if (!tree.alive) {
+      tree.respawnTimer -= dt;
+
+      if (tree.respawnTimer <= 0) {
+        tree.alive = true;
+        tree.hp = 3;
+        tree.group.visible = true;
+      }
+    }
+  }
+
   let forward = 0;
   let side = 0;
 
@@ -663,7 +881,6 @@ function animate() {
     }
   }
 
-  // 좌우 이동 방향 보정
   const move = new THREE.Vector3(-side, 0, forward);
 
   if (move.length() > 1) move.normalize();
@@ -678,11 +895,10 @@ function animate() {
 
   player.rotation.y = angle;
 
-  // 월드 경계
   player.position.x = THREE.MathUtils.clamp(player.position.x, -95, 95);
   player.position.z = THREE.MathUtils.clamp(player.position.z, -95, 95);
 
-  // 검 공격 애니메이션: 뒤로 들기 -> 빠른 베기 -> 원래 자세
+  // 검 공격 애니메이션
   if (attacking) {
     attackTime += dt;
     const progress = Math.min(attackTime / 0.52, 1);
@@ -736,6 +952,7 @@ function animate() {
         if (!slime.alive) continue;
 
         const distance = player.position.distanceTo(slime.group.position);
+
         const toSlime = new THREE.Vector3()
           .subVectors(slime.group.position, player.position)
           .setY(0)
@@ -750,9 +967,10 @@ function animate() {
       }
 
       if (target) {
-        target.hp -= 25;
+        target.hp -= swordDamage;
         target.aggro = true;
         hasHit = true;
+
         updateSlimeBar(target);
 
         if (target.hp <= 0) {
@@ -761,6 +979,9 @@ function animate() {
         }
 
         updateHUD();
+      } else {
+        // 슬라임을 맞히지 못했다면 나무 채집 시도
+        hitTree();
       }
     }
 
@@ -773,8 +994,9 @@ function animate() {
   }
 
   attackCooldown = Math.max(0, attackCooldown - dt);
+  if (!attacking) slashEffect.visible = false;
 
-  // 슬라임 행동과 점프 공격 모션
+  // 슬라임 행동과 점프 공격
   for (const slime of slimes) {
     if (!slime.alive) continue;
 
@@ -855,7 +1077,7 @@ function animate() {
     }
   }
 
-  // 카메라: 살짝 높은 곳에서 내려다보는 시점
+  // 카메라: 위에서 살짝 내려다보는 시점
   const cameraDistance = 7.5;
   const height = 4.2 + pitch * 3;
 

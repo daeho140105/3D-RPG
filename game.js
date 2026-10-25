@@ -141,6 +141,32 @@ const mouth = new THREE.Mesh(
 mouth.position.set(0, 0.59, -0.77);
 slime.add(mouth);
 
+// 슬라임 머리 위 체력바
+const hpBar = new THREE.Group();
+slime.add(hpBar);
+hpBar.position.set(0, 2.0, 0);
+
+const hpBackground = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.8, 0.18),
+  new THREE.MeshBasicMaterial({ color: 0x222222 })
+);
+hpBar.add(hpBackground);
+
+const hpFill = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.8, 0.14),
+  new THREE.MeshBasicMaterial({ color: 0xff3333 })
+);
+hpFill.position.z = 0.01;
+hpBar.add(hpFill);
+
+// 체력바 업데이트
+function updateSlimeBar() {
+  const ratio = Math.max(0, slimeHP / 60);
+  hpFill.scale.x = ratio;
+  hpFill.position.x = -0.9 * (1 - ratio);
+  hpBar.visible = slimeAlive;
+}
+
 let slimeHP = 60;
 let slimeAlive = true;
 let kills = 0;
@@ -167,7 +193,7 @@ function updateHUD() {
   `;
 }
 updateHUD();
-
+updateSlimeBar();
 // 조작
 const keys = {};
 let angle = 0;
@@ -224,6 +250,7 @@ function defeatSlime() {
     slimeHP = 60;
     slimeAlive = true;
     slime.visible = true;
+    updateSlimeBar();
     slime.position.set(
       player.position.x + 2,
       0,
@@ -285,7 +312,7 @@ function animate() {
       if (slimeAlive && distance < 3.5 && facing > 0.2) {
         slimeHP -= 25;
         hasHit = true;
-
+        updateSlimeBar();
         if (slimeHP <= 0) {
           slimeHP = 0;
           defeatSlime();
@@ -319,6 +346,7 @@ function animate() {
     player.position.y + 1.2,
     player.position.z
   );
+  hpBar.quaternion.copy(camera.quaternion);
 
   renderer.render(scene, camera);
 }
